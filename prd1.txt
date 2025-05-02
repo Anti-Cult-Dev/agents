@@ -1,0 +1,394 @@
+Product Requirements Document (PRD)
+Step 1: Sketch UI Screens for the Three Builders
+1. Background & Goal
+We’re building a unified, no-code/low-code platform where users visually assemble:
+
+An Agent Workflow (drag-drop logic nodes)
+An MCP Server (drag-drop server functions/endpoints)
+A Web UI (drag-drop React/Next.js components)
+Objective of Step 1
+Produce detailed UI sketches, interaction logic, and parallel technical tasks to enable rapid prototyping of the three builder canvases.
+
+2. Scope
+Deliver wireframe‐level designs for each builder.
+Define core components, data flows, and user interactions.
+Outline parallel backend/schema tasks needed to support the UI.
+Capture forward-looking considerations (collaboration, templates, persistence).
+3. Stakeholders
+Product Manager
+UX/UI Designer
+Front-end Engineer
+Back-end/Infrastructure Engineer
+QA Engineer
+4. User Personas & Stories
+Persona | Description | Key Stories
+---|---|---
+Non-technical User (“Alice”)| SaaS admin who wants to build an agent flow without code.| “As Alice, I drag a ‘Trigger’ node, connect it to a ‘Process’ node, and save my workflow.”
+Developer (“Bob”)| Backend engineer who composes MCP server endpoints visually.| “As Bob, I add a ‘GET’ block with JSON schema, wire it to a ‘Lambda’ block, then deploy.”
+Front-end Designer (“Carol”)| UI designer building forms/dashboards.| “As Carol, I drag a Table component, bind it to data from my workflow outputs.”
+
+5. Functional Requirements
+5.1 Canvas & Toolbar
+Toolbar (left panel) with draggable blocks for each builder.
+Canvas (main area) with pan/zoom, grid background.
+Properties Panel (right panel) showing config for selected block.
+Top Bar: Save, Deploy, Templates, Undo/Redo.
+5.2 Common Interactions
+Drag-start / drop onto canvas
+Select block → open Properties
+Click-and-drag handles to connect blocks
+Double-click block to edit label/config
+Context menu on right-click (delete, duplicate, group)
+6. UI Screen Definitions
+6.1 Agent Workflow Builder
+Purpose: Graph business logic nodes (Trigger → Action → Output).
+Components:
+
+Toolbar items: Trigger, Action, Condition, Loop, Output.
+Canvas with snap-to-grid.
+NodeComponent with icon, label, drag handle, connect ports.
+Properties: type, label, description, parameters (e.g. prompt template).
+Bottom Panel: Test Prompt input + Run Test button.
+Data Model:
+
+ts
+CopyInsert
+interface WorkflowNode { id, type, label, x, y, config }
+interface WorkflowConnection { id, sourceId, targetId }
+6.2 MCP Server Builder
+Purpose: Visually compose serverless endpoints & middleware.
+Components:
+
+Toolbar: Endpoint block (GET, POST), Function block, DB Query block, Auth block.
+Canvas: sequence flow with branching.
+Properties: route path, method, request schema, response schema, attached code stub.
+Preview Panel: show generated Deno edge function signature.
+Data Model:
+
+ts
+CopyInsert
+interface EndpointBlock { id, method, path, schema, codeSnippet }
+interface FunctionBlock { id, code, envVars }
+6.3 Web UI Builder
+Purpose: Drag-drop React/Next.js UI components.
+Components:
+
+Toolbar: Form, Table, Chart, Button, Input, Panel.
+Canvas: page layout grid.
+Properties: component props (data source, styles, events).
+Live Preview iframe or side-by-side React render.
+Data Model:
+
+ts
+CopyInsert
+interface UIBlock { id, type, props, children[] }
+7. Parallel Technical Tasks
+7.1 Nile Schema Design
+Define tables/collections for workflows, serverDefinitions, uiDefinitions, deployments.
+Tenant scoping fields.
+7.2 JSON DSL & Codegen
+Draft JSON schema for each canvas output.
+Build codegen library to serialize DSL → TS/JS code.
+7.3 Canvas Framework Setup
+Scaffold React components: Canvas, Toolbar, Node, Connection.
+Integrate react-zoom-pan-pinch.
+7.4 State Management
+Choose Zustand or Context + Reducer per canvas.
+Persist drafts in Nile via REST/GraphQL.
+7.5 Vercel API Integration
+Stub service to call Vercel REST for deployments.
+Auth flow for user’s Vercel token.
+8. Timeline & Milestones
+Week 1
+
+Day 1–2: Finalize PRD & wireframes in Figma/Markdown.
+Day 3–4: Scaffold canvas framework & common components.
+Day 5: Nile schema & basic data persistence.
+Week 2
+
+Day 1–2: Build Agent Workflow Builder UI + connect to state.
+Day 3–4: Parallel: stub MCP Server Builder + UI Builder.
+Day 5: Demo first canvas & iterate.
+9. Acceptance Criteria
+Sketches for all three builders approved by Product/UX.
+Reusable React canvas components in codebase.
+Nile schema definitions created and tested.
+Basic drag-drop + connect flow working in Agent Workflow canvas.
+10. Forward-Looking Considerations
+Templates library for saved workflows/endpoints/UI patterns.
+Real-time collaboration (WebSocket sync).
+Undo/Redo persistence.
+Extensible plugin system for custom blocks.
+
+## Step 2: Nile Schema Design
+
+### 2.1 Objective & Background
+Design and implement database schemas in Nile to persist all definitions and deployments from the three builders (workflows, MCP server configs, UI layouts). Ensure multi-tenant isolation, versioning, and auditability.
+
+### 2.2 Scope
+- Create collections/tables for:
+  - `WorkflowDefinitions`
+  - `ServerDefinitions`
+  - `UIDefinitions`
+  - `Deployments`
+- Include fields for tenant, version, status, metadata, timestamps.
+- Add indexes for efficient lookup and filtering.
+- Define migrations and seed data.
+
+### 2.3 Stakeholders
+- Back-end Engineer  
+- DevOps/DBA  
+- Product Manager  
+- QA Engineer  
+
+### 2.4 Data Models
+
+**WorkflowDefinitions**  
+- `id: UUID`  
+- `tenantId: string`  
+- `name: string`  
+- `version: integer`  
+- `nodes: JSON`  
+- `connections: JSON`  
+- `status: enum('draft','published')`  
+- `createdAt, updatedAt, createdBy`
+
+**ServerDefinitions**  
+- `id: UUID`  
+- `tenantId: string`  
+- `name: string`  
+- `version: integer`  
+- `endpoints: JSON`  
+- `middleware: JSON`  
+- `status, timestamps, audit metadata`
+
+**UIDefinitions**  
+- `id: UUID`  
+- `tenantId: string`  
+- `pageKey: string`  
+- `components: JSON`  
+- `propsSchema: JSON`  
+- `status, timestamps`
+
+**Deployments**  
+- `id: UUID`  
+- `tenantId: string`  
+- `targetType: enum('workflow','server','ui')`  
+- `targetId: UUID`  
+- `deploymentId: string`  (Vercel)  
+- `domain: string`  
+- `status: enum('pending','success','failed')`  
+- `triggeredBy, triggeredAt`
+
+### 2.5 Multi-Tenancy & Security
+- Partition all tables by `tenantId`.  
+- Enforce row-level security in Nile.  
+- Access controls so users only see their own tenant’s data.
+
+### 2.6 Relationships & Versioning
+- Foreign keys from definitions → tenants.  
+- Increment `version` on each publish.  
+- Soft-delete via `isDeleted` flag.  
+- Maintain an `AuditLog` table for changes history.
+
+### 2.7 Non-Functional
+- High availability, low latency.  
+- JSON columns with indexing.  
+- Encryption at rest/in transit.  
+- Automated backups & DR.
+
+### 2.8 API Endpoints
+- `GET /api/workflows?tenantId=…`  
+- `POST /api/workflows`  
+- `PATCH /api/workflows/:id/publish`  
+- (Similarly for server & UI definitions)  
+- Implement via `lib/nile.ts`.
+
+### 2.9 Migrations & Seeds
+- Write initial migrations.  
+- Seed canonical templates (e.g. “QA workflow”, “REST endpoint”, “Dashboard layout”).
+
+### 2.10 Timeline & Milestones
+- **Day 1:** Draft schemas & review.  
+- **Day 2:** Write & run migrations.  
+- **Day 3:** Build CRUD endpoints.  
+- **Day 4:** Hook up canvas save/load.  
+- **Day 5:** QA, performance tuning.
+
+### 2.11 Acceptance Criteria
+- All schemas exist & are migrated in dev.  
+- CRUD API returns correct data.  
+- Canvas UIs can save/load drafts.  
+- Tenant isolation verified.
+
+## Step 3: Canvas Framework Setup
+
+### 3.1 Objective & Background
+Provide a reusable React component framework (Canvas, Toolbar, Node, Connection, Panels) to power all three builders. Leverage `react-zoom-pan-pinch` for pan/zoom and ensure a consistent developer API across workflows, servers, and UI builders.
+
+### 3.2 Scope
+- Scaffold core components:
+  - **CanvasWrapper**: pan/zoom container with grid background and drop-zone handlers.
+  - **Toolbar**: draggable block palette, grouped by category.
+  - **NodeBase**: draggable/resizable node container with ports and icon slot.
+  - **ConnectionPath**: SVG or canvas line/Bezier curve between node ports.
+  - **PropertiesPanel**: side panel for editing the selected block’s config.
+  - **TopBar**: global actions (Save, Templates, Undo/Redo).
+- Integrate `ThemeProvider` for light/dark modes.
+- Establish folder structure under `components/canvas/`.
+
+### 3.3 Stakeholders
+- Front-end Engineer  
+- UX/UI Designer  
+- QA Engineer  
+- Accessibility Specialist  
+
+### 3.4 Component Library
+- **CanvasWrapper**  
+  Props: `children`, `onDrop`, `onDragOver`, `onClickCanvas`  
+- **Toolbar**  
+  Props: `blocks: BlockDef[]`, `onDragStart(blockType: string)`  
+- **NodeBase**  
+  Props: `id`, `x`, `y`, `selected`, `onDrag(delta)`, `onSelect(id)`, `children`  
+- **ConnectionPath**  
+  Props: `start: Point`, `end: Point`, `type?: 'straight'|'curve'`  
+- **PropertiesPanel**  
+  Props: `selectedId`, `config`, `onChange(updatedConfig)`  
+- **TopBar**  
+  Actions: `save()`, `deploy()`, `undo()`, `redo()`, `openTemplates()`
+
+### 3.5 State Management & Data Flow
+- Use Zustand with slices for each builder: `useWorkflowStore`, `useServerStore`, `useUIStore`.
+- Wrap each canvas in a `CanvasProvider` for context.
+- Expose hooks: `useCanvasState()`, `useCanvasActions()`.
+
+### 3.6 Non-Functional Requirements
+- Maintain 60 fps with 100+ nodes.
+- Keyboard shortcuts: Delete, Ctrl+Z/Y, arrow-key nudge.
+- ARIA roles and screen-reader labels for accessibility.
+- CSS-variable theming to support light/dark mode.
+
+### 3.7 Parallel Tasks
+- Configure Tailwind CSS for grid backgrounds and node styling.
+- Set up Storybook to document/test each canvas component.
+- Write unit tests for drag/drop and connection logic.
+- Define shared TypeScript interfaces (`BlockDef`, `Point`, `CanvasConfig`).
+
+### 3.8 Timeline & Milestones
+- **Day 1:** Scaffold component skeletons & folder structure.  
+- **Day 2:** Implement drag/drop + pan/zoom integration.  
+- **Day 3:** Build a sample WorkflowBuilder using the new canvas.  
+- **Day 4:** QA, accessibility audit, fix edge cases.  
+- **Day 5:** Document components & finalize Storybook.
+
+### 3.9 Acceptance Criteria
+- Core canvas components render correctly in isolation.  
+- Node dragging and port connections function end-to-end.  
+- Zustand store updates reflect UI interactions.  
+- All components are listed in Storybook and pass basic tests.
+
+## Step 4: State Management & Data Flow
+
+### 4.1 Objective & Background
+Define how canvas state is stored, managed, and synchronized across UI and backend. Use Zustand for local store, with persistence to Nile and optional real-time collaboration.
+
+### 4.2 Scope
+- Create Zustand stores for each builder: `useWorkflowStore`, `useServerStore`, `useUIStore`.
+- Define core actions: `addNode`, `updateNode`, `deleteNode`, `connectNodes`, `disconnectNodes`, `setSelected`, `updateConfig`.
+- Implement debounced persistence of state to Nile: `saveDraft`, `loadDraft`.
+- Integrate publish flow via versioned endpoints.
+- Provide undo/redo via Immer middleware.
+
+### 4.3 Stakeholders
+- Front-end Engineer  
+- Back-end Engineer  
+- QA Engineer
+
+### 4.4 Store API & Interfaces
+- Define TypeScript interfaces for store shape: `Node`, `Connection`, `Config`.
+- Actions interface: selectors and actions from each store.
+- Use Immer middleware for immutability and undo/redo support.
+
+### 4.5 Persistence Flow
+- On store change: debounce 1s, call `saveDraft` API endpoint.
+- On init: fetch last draft via `loadDraft` endpoint.
+- On publish: call `publishDefinition`, increment version.
+
+### 4.6 Real-time Collaboration (Optional)
+- Plan WebSocket integration on tenant channel.
+- Broadcast patches on change to collaborators.
+
+### 4.7 Non-Functional Requirements
+- Debounced saves (<500ms) to avoid server overload.
+- Offline fallback via localStorage caching.
+- Stable identifiers for undo/redo consistency.
+
+### 4.8 Timeline & Milestones
+- **Day 1:** Define store interfaces & actions.  
+- **Day 2:** Implement Zustand stores & integrate with canvas.  
+- **Day 3:** Add persistence handlers (save/load).  
+- **Day 4:** Implement undo/redo & collaboration stubs.  
+- **Day 5:** QA & performance tuning.
+
+### 4.9 Acceptance Criteria
+- Store actions update UI and internal state correctly.  
+- Canvas state persists and reloads accurately.  
+- Undo/redo functions reliably.  
+- Collaboration stubs integrated.
+
+## Step 5: Code Generation & Deployment Orchestration
+
+### 5.1 Objective & Background
+Combine the outputs from the Workflow, MCP Server, and Web UI builders into executable code, then deploy to Vercel automatically. Ensure end-to-end flow from design to live environment.
+
+### 5.2 Scope
+- Codegen modules for:
+  - Workflow DSL → `workflow.ts` definitions
+  - MCP JSON → Edge function code + `import_map.json`
+  - UI JSON → Next.js pages/components
+- Template engine to merge user definitions into file templates
+- Vercel API integration: project creation, deployment, aliasing
+- Capture deployment metadata in Nile
+
+### 5.3 Stakeholders
+- Front-end Engineer  
+- Back-end/DevOps Engineer  
+- QA Engineer  
+- Product Manager
+
+### 5.4 Codegen Modules
+- **workflow-codegen**: generates a TS module exporting the workflow graph
+- **mcp-codegen**: builds Deno edge-runtime entrypoint and import map
+- **ui-codegen**: emits Next.js page files & component files
+- Configurable templates, using Handlebars or EJS
+
+### 5.5 Deployment Pipeline
+1. **Build**: run codegen modules → output ZIP or directory
+2. **Deploy**: call Vercel REST (`POST /v13/deployments`) with files payload
+3. **Alias**: set custom domain via Vercel Domains API
+4. **Monitor**: poll deployment status, surface logs
+5. **Record**: save `deploymentId`, URL, status in `Deployments` table
+
+### 5.6 Persistence of Deployment Data
+- On successful deploy, update `Deployments` with live URL and status `success`
+- On failure, record error logs and status `failed`
+- Provide rollback by redeploying previous version
+
+### 5.7 Non-Functional Requirements
+- Idempotent deployments: same definitions → same URLs
+- Secure token storage & rotation for Vercel API
+- Rollback capability
+- Asynchronous job queue for large deployments
+
+### 5.8 Timeline & Milestones
+- **Day 1:** Define codegen interfaces & templates
+- **Day 2:** Implement workflow-codegen & ui-codegen
+- **Day 3:** Implement mcp-codegen & test locally
+- **Day 4:** Integrate Vercel API calls & record in Nile
+- **Day 5:** End-to-end test, rollback flow, QA
+
+### 5.9 Acceptance Criteria
+- Codegen modules produce valid, lint-free code
+- Vercel deployments succeed automatically and return live URL
+- Domains API correctly assigns custom domains
+- Deployment records in Nile match reality
