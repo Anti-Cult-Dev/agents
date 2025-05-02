@@ -1,17 +1,19 @@
+'use server';
 import { NextRequest, NextResponse } from 'next/server';
-import { getNile } from '../../../lib/nile';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET() {
-  const client = await getNile();
-  const { data, error } = await client.from('uis').select();
+  const supabase = createServerClient({ supabaseUrl: process.env.SUPABASE_URL!, supabaseKey: process.env.SUPABASE_SECRET_KEY!, cookies });
+  const { data, error } = await supabase.from('uis').select();
   if (error) return NextResponse.error();
   return NextResponse.json(data);
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const client = await getNile();
-  const { data, error } = await client.from('uis').insert([body]);
+  const supabase = createServerClient({ supabaseUrl: process.env.SUPABASE_URL!, supabaseKey: process.env.SUPABASE_SECRET_KEY!, cookies });
+  const { data, error } = await supabase.from('uis').insert([body]);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data);
 }

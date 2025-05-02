@@ -13,6 +13,7 @@ export interface BlockDef {
 }
 
 export interface Node {
+  label: string;
   id: string;
   x: number;
   y: number;
@@ -20,8 +21,9 @@ export interface Node {
   config?: any;
 }
 
+// Connection now uses node IDs (string) for start/end
 export interface Connection {
   id: string;
-  start: Point;
-  end: Point;
+  start: string; // node id
+  end: string;   // node id
 }

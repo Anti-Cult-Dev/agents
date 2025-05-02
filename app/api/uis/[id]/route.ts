@@ -1,10 +1,12 @@
+'use server';
 import { NextRequest, NextResponse } from 'next/server';
-import { getNile } from '../../../../lib/nile';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
-  const client = await getNile();
-  const { data, error } = await client.from('uis').select().eq('id', id).single();
+  const supabase = createServerClient({ supabaseUrl: process.env.SUPABASE_URL!, supabaseKey: process.env.SUPABASE_SECRET_KEY!, cookies });
+  const { data, error } = await supabase.from('uis').select().eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
   return NextResponse.json(data);
 }
@@ -12,16 +14,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   const body = await request.json();
-  const client = await getNile();
-  const { data, error } = await client.from('uis').update(body).eq('id', id);
+  const supabase = createServerClient({ supabaseUrl: process.env.SUPABASE_URL!, supabaseKey: process.env.SUPABASE_SECRET_KEY!, cookies });
+  const { data, error } = await supabase.from('uis').update(body).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data);
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
-  const client = await getNile();
-  const { error } = await client.from('uis').delete().eq('id', id);
+  const supabase = createServerClient({ supabaseUrl: process.env.SUPABASE_URL!, supabaseKey: process.env.SUPABASE_SECRET_KEY!, cookies });
+  const { error } = await supabase.from('uis').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ success: true });
 }

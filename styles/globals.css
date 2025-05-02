@@ -1,3 +1,61 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f7f8fa;
+  color: #222;
+}
+
+html, body, #__next, main {
+  height: 100%;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e0e7ef;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+
+.bg-gradient-to-br {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ef 100%);
+}
+
+.dark .bg-gradient-to-br {
+  background: linear-gradient(135deg, #181a20 0%, #23263a 100%);
+}
+
+.shadow-xl {
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+}
+
+.rounded-2xl {
+  border-radius: 1.5rem;
+}
+
+/* React Flow overrides */
+.react-flow__node-default {
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px 0 rgba(31, 38, 135, 0.08);
+  border: 1px solid #c7d2fe;
+  padding: 0.5rem 1rem;
+  min-width: 120px;
+  font-weight: 500;
+}
+.react-flow__node.selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #6366f1;
+}
+.react-flow__controls-button {
+  background: #f1f5f9;
+  border-radius: 6px;
+  margin: 0 2px;
+}
+.react-flow__controls-button svg {
+  color: #6366f1;
+}

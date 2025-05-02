@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CanvasWrapper } from '../canvas/CanvasWrapper';
 import { Toolbar } from '../canvas/Toolbar';
 import { NodeBase } from '../canvas/NodeBase';
@@ -28,6 +28,21 @@ export default function WorkflowBuilder() {
     { id: 'document', type: 'document', label: 'Document', icon: <FileText /> },
   ];
 
+  const [recordId, setRecordId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/workflows', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.length) {
+          const wf = data[0];
+          setRecordId(wf.id);
+          wf.nodes.forEach((n: any) => addNode(n));
+          wf.connections.forEach((c: any) => connectNodes(c));
+        }
+      });
+  }, []);
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const type = e.dataTransfer.getData('blockType');
@@ -46,14 +61,27 @@ export default function WorkflowBuilder() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetch('/api/workflows', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, connections })
-      });
+      const payload = { nodes, connections };
+      if (recordId) {
+        fetch(`/api/workflows/${recordId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+      } else {
+        fetch('/api/workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        })
+          .then((r) => r.json())
+          .then((ret) => setRecordId(ret[0]?.id));
+      }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [nodes, connections]);
+  }, [nodes, connections, recordId]);
 
   return (
     <div className="h-full flex">
@@ -61,9 +89,19 @@ export default function WorkflowBuilder() {
       <div className="relative flex-1 h-full">
         <CanvasWrapper onDrop={handleDrop} onDragOver={handleDragOver} onClickCanvas={() => setSelected(null)}>
           <svg className="absolute inset-0 w-full h-full">
-            {connections.map(conn => (
-              <ConnectionPath key={conn.id} start={conn.start} end={conn.end} type="curve" />
-            ))}
+            {connections.map(conn => {
+              const startNode = nodes.find(n => n.id === conn.start);
+              const endNode = nodes.find(n => n.id === conn.end);
+              if (!startNode || !endNode) return null;
+              return (
+                <ConnectionPath
+                  key={conn.id}
+                  start={{ x: startNode.x, y: startNode.y }}
+                  end={{ x: endNode.x, y: endNode.y }}
+                  type="curve"
+                />
+              );
+            })}
             {nodes.map(node => (
               <NodeBase
                 key={node.id}

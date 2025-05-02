@@ -1,68 +1,118 @@
 'use client';
 
-import React from 'react';
-import { CanvasWrapper } from '../canvas/CanvasWrapper';
-import { Toolbar } from '../canvas/Toolbar';
-import { NodeBase } from '../canvas/NodeBase';
-import { ConnectionPath } from '../canvas/ConnectionPath';
-import { PropertiesPanel } from '../canvas/PropertiesPanel';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import ReactFlow, {
+  ReactFlowProvider,
+  addEdge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  OnConnect,
+  Edge
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { useUIStore } from '../../stores/uiStore';
-import { BlockDef } from '../canvas/types';
 import { Layout, FileText, Image, Edit3, Square } from 'lucide-react';
+import { PropertiesPanel } from '../canvas/PropertiesPanel';
+
+const blocks = [
+  { id: 'container', label: 'Container', icon: <Layout /> },
+  { id: 'text', label: 'Text', icon: <FileText /> },
+  { id: 'image', label: 'Image', icon: <Image /> },
+  { id: 'input', label: 'Input', icon: <Edit3 /> },
+  { id: 'button', label: 'Button', icon: <Square /> },
+];
 
 export default function UIBuilder() {
-  const nodes = useUIStore(s => s.nodes);
-  const connections = useUIStore(s => s.connections);
-  const selectedId = useUIStore(s => s.selectedId);
-  const addNode = useUIStore(s => s.addNode);
-  const updateNode = useUIStore(s => s.updateNode);
-  const connectNodes = useUIStore(s => s.connectNodes);
-  const setSelected = useUIStore(s => s.setSelected);
-  const updateConfig = useUIStore(s => s.updateConfig);
+  const store = useUIStore();
+  const initialNodes = store.nodes.map(n => ({
+    id: n.id,
+    type: 'default',
+    position: { x: n.x, y: n.y },
+    data: { label: n.label },
+  }));
+  // Each edge must have an id for React Flow
+  const initialEdges: Edge[] = store.connections.map((c, idx) => ({ id: c.id ?? `e${idx}`, source: c.start, target: c.end }));
 
-  const blocks: BlockDef[] = [
-    { id: 'container', type: 'container', label: 'Container', icon: <Layout /> },
-    { id: 'text', type: 'text', label: 'Text', icon: <FileText /> },
-    { id: 'image', type: 'image', label: 'Image', icon: <Image /> },
-    { id: 'input', type: 'input', label: 'Input', icon: <Edit3 /> },
-    { id: 'button', type: 'button', label: 'Button', icon: <Square /> },
-  ];
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [rfInstance, setRfInstance] = useState<any>(null);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const type = e.dataTransfer.getData('blockType');
-    if (!type) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const id = Date.now().toString();
-    addNode({ id, type, label: type, x, y });
-    setSelected(id);
-  };
+  const onConnect: OnConnect = useCallback(
+    (params) => {
+      setEdges(es => addEdge(params, es));
+      store.connectNodes({ id: params.id ?? `${params.source}-${params.target}`, start: params.source, end: params.target });
+    },
+    [setEdges, store]
+  );
 
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const onDragOver = useCallback((evt: React.DragEvent) => {
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (evt: React.DragEvent) => {
+      evt.preventDefault();
+      if (!reactFlowWrapper.current || !rfInstance) return;
+      const bounds = reactFlowWrapper.current.getBoundingClientRect();
+      const type = evt.dataTransfer.getData('application/reactflow');
+      if (!type) return;
+      const pos = rfInstance.project({ x: evt.clientX - bounds.left, y: evt.clientY - bounds.top });
+      const id = Date.now().toString();
+      const newNode = { id, type: 'default', position: pos, data: { label: type } };
+      setNodes(ns => ns.concat(newNode));
+      store.addNode({ id, type, label: type, x: pos.x, y: pos.y });
+    },
+    [rfInstance, setNodes, store]
+  );
+
+  useEffect(() => {
+    // Persist connections as node IDs
+    const payload = { nodes, connections: edges.map(e => ({ id: e.id, start: e.source, end: e.target })) };
+    if (store.recordId) {
+      fetch(`/api/uis/${store.recordId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    } else {
+      fetch('/api/uis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(res => res.json())
+        .then(ret => store.setRecordId(ret[0]?.id));
+    }
+  }, [nodes, edges, store]);
 
   return (
-    <div className="h-full flex">
-      <Toolbar blocks={blocks} onDragStart={() => {}} />
-      <div className="relative flex-1 h-full">
-        <CanvasWrapper onDrop={handleDrop} onDragOver={handleDragOver} onClickCanvas={() => setSelected(null)}>
-          <svg className="absolute inset-0 w-full h-full">
-            {connections.map(c => (
-              <ConnectionPath key={c.id} start={c.start} end={c.end} type="curve" />
-            ))}
-            {nodes.map(n => (
-              <NodeBase key={n.id} node={n} selected={n.id === selectedId} onDrag={updateNode} onSelect={setSelected}>
-                <div className="p-2 text-sm">{n.label}</div>
-              </NodeBase>
-            ))}
-          </svg>
-        </CanvasWrapper>
+    <div className="flex h-full">
+      <div className="w-60 p-2 bg-gray-100 overflow-auto">
+        {blocks.map(block => (
+          <div key={block.id} className="flex items-center p-2 m-1 bg-white shadow cursor-grab" draggable onDragStart={e => e.dataTransfer.setData('application/reactflow', block.label)}>
+            {block.icon}
+            <span className="ml-2">{block.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex-1 h-full" ref={reactFlowWrapper}>
+        <ReactFlowProvider>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={setRfInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            fitView
+          >
+            <Controls />
+            <Background />
+          </ReactFlow>
+        </ReactFlowProvider>
       </div>
       <PropertiesPanel
-        selectedId={selectedId}
-        config={selectedId ? nodes.find(n => n.id === selectedId)?.config : {}}
-        onChange={cfg => selectedId && updateConfig(selectedId, cfg)}
+        selectedId={store.selectedId}
+        config={store.selectedId ? store.nodes.find(n => n.id === store.selectedId)?.config : {}}
+        onChange={cfg => store.selectedId && store.updateConfig(store.selectedId, cfg)}
       />
     </div>
   );
